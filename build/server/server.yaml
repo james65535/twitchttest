@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: twitchtest-svc
+  namespace: default
+spec:
+  selector:
+    app: twitchtest
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: LoadBalancer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: twitchtest-dep
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: twitchtest
+  template:
+    metadata:
+      labels:
+        app: twitchtest
+    spec:
+      containers:
+        - name: twitchtest
+          image: james65535/twitchtest:latest
+          imagePullPolicy: Always
+          ports:
+          - containerPort: 8080
