@@ -14,7 +14,20 @@ import (
 var (
 	address string
 	kafkaAddress string
+	clientId string
+	clientSecret string
+	callbackUrl string
 )
+
+type notificationMsg struct {
+	link string
+	body string
+}
+func writeNotification() error {
+
+
+	return nil
+}
 
 func kafkaWrite() error {
 	// to produce messages
@@ -62,38 +75,58 @@ func kafkaRead() error {
 	return nil
 }
 
-func init() {
-	// Configure GraphDB Access
-	if os.Getenv("ADDRESS") != "" {
-		address = os.Getenv("ADDRESS")
-	} else {
-		log.Printf("No server address specified\n")
-		address = ":8080"
-	}
-	if os.Getenv("KAFKAADDRESS") != "" {
-		kafkaAddress = os.Getenv("KAFKAADDRESS")
-	} else {
-		log.Printf("No kafka server address specified\n")
-		kafkaAddress = "127.0.0.1:9092"
+// Respond to callback challenge
+func callback(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		// Receive subscription verify/deny challenges
+		log.Printf("Callback GET request received from %v!\n", r.RemoteAddr)
+		// TODO verify that subscription challenge is a verify or a deny. Check request payload
+
+		query := r.URL.Query()
+		log.Printf("URL Params: %s", query) // URL Params: map[hub.challenge:[GJvOdj0BQOXdjN5gP7giEDU0I_dUA-nzyOANT8Sp] hub.lease_seconds:[6400] hub.mode:[subscribe] hub.topic:[https://api.twitch.tv/helix/users/follows?first=1&to_id=188951100]]
+		challenge := query.Get("hub.challenge")
+		log.Printf("hub.challenge: %v\n", challenge)
+
+		// Respond to subscription challenge verify request
+		w.WriteHeader(200)
+		w.Write([]byte(challenge))
+	} else if r.Method == "POST" {
+		// Receive subscription notification
+		// TODO verify header "Twitch-Notification-Id" with secret hash
+		log.Printf("Callback POST request received!\n")
+		log.Printf("Callback Header: %s", r.Header)
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			log.Printf("Cannot read body: %s", err)
+		}
+		log.Printf("Callback Body: %s", body)
 	}
 }
 
-func main() {
-	log.Printf("Server starting")
-	submit := func(w http.ResponseWriter, r *http.Request){
-		if r.Method == "POST" {
-			log.Printf("POST Response received!\n")
-			log.Printf("Header: %s",r.Header)
-			body, err := ioutil.ReadAll(r.Body)
-			if err != nil {
-				log.Printf("Cannot read body: %s", err)
-			}
-			log.Printf("Body: %s",body)
-		} else { return }
+func submit(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		log.Printf("Submit POST request received!\n")
+		log.Printf("Header: %s", r.Header)
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			log.Printf("Cannot read body: %s", err)
+		}
+		log.Printf("Body: %s", body)
+	} else if r.Method == "GET" {
+		log.Printf("Submit GET request received!\n")
+		log.Printf("Header: %s", r.Header)
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			log.Printf("Cannot read body: %s", err)
+		}
+		log.Printf("Body: %s", body)
 	}
-	home := func(w http.ResponseWriter, r *http.Request){
-		if r.Method == "GET" {
-			log.Printf("GET Response received!\n")
+}
+
+func home(w http.ResponseWriter, r *http.Request){
+	if r.Method == "GET" {
+		log.Printf("Home GET request received!\n")
+		/*
 			err := kafkaWrite()
 			if err != nil {
 				log.Printf("Kafka Write Error %v\n", err)
@@ -104,8 +137,51 @@ func main() {
 			if readErr != nil {
 				log.Printf("Kafka Read Error %v\n", readErr)
 			}
-		} else {return}
+		*/
+	} else {return}
+}
+
+func init() {
+	// Webserver
+	if os.Getenv("ADDRESS") != "" {
+		address = os.Getenv("ADDRESS")
+	} else {
+		address = ":8080"
+		log.Printf("No server address specified, defaulting to: %v\n", address)
 	}
+	if os.Getenv("CALLBACKURL") != "" {
+		callbackUrl = os.Getenv("CALLBACKURL")
+	} else {
+		callbackUrl = "127.0.0.1"
+		log.Printf("No callback URL specified, defaulting to: %v\n", callbackUrl)
+	}
+
+
+	// Kafka
+	if os.Getenv("KAFKAADDRESS") != "" {
+		kafkaAddress = os.Getenv("KAFKAADDRESS")
+	} else {
+		log.Printf("No kafka server address specified\n")
+		kafkaAddress = "127.0.0.1:9092"
+	}
+
+	// Twitch
+	if os.Getenv("TWITCHCLIENTID") != "" {
+		clientId = os.Getenv("TWITCHCLIENTID")
+	} else {
+		log.Printf("No twitch client ID specified\n")
+	}
+	if os.Getenv("TWITCHCLIENTSECRET") != "" {
+		clientSecret = os.Getenv("TWITCHCLIENTSECRET")
+	} else {
+		log.Printf("No twitch client secret specified\n")
+	}
+}
+
+func main() {
+	writeNotification()
+	log.Printf("Server starting")
+	http.HandleFunc("/callback", callback)
 	http.HandleFunc("/submit", submit)
 	http.HandleFunc("/", home)
 	err := http.ListenAndServe(address, nil)
