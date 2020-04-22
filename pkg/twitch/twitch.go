@@ -22,6 +22,8 @@ type webhookSub struct {
 	Lease int `json:"hub.lease_seconds"`
 }
 
+// TODO remove logging
+
 // Obtains an access token
 func GetAccessToken(id string, secret string, url string) (accesToken string, expires int, err error) {
 	req, err := http.NewRequest("POST", url, nil)
@@ -84,7 +86,7 @@ func validate(accessToken string, url string) error {
 
 	// TODO handle error codes example: {"status":401,"message":"invalid access token"}
 	if resp.StatusCode == 200 {
-		return nil // {"client_id":"yssjfkvublum0gb5iel02puoyz7d3k","scopes":[],"expires_in":5190956}
+		return nil // {"client_id":"somestuff","scopes":[],"expires_in":5190956}
 	} else {
 		return fmt.Errorf(string(body))
 	}
@@ -115,15 +117,19 @@ func Query(accessToken string, clientId string, url string) error {
 
 	// TODO handle error codes example: {"status":401,"message":"invalid access token"}
 	if resp.StatusCode == 200 {
-		return nil // {"client_id":"yssjfkvublum0gb5iel02puoyz7d3k","scopes":[],"expires_in":5190956}
+		return nil // {"client_id":"somestuff","scopes":[],"expires_in":5190956}
 	} else {
 		return fmt.Errorf(string(body))
 	}
 }
 
 // Subscribe to a webhook
-func SubscribeWebhook (accessToken string, clientId string, apiUrl string, topicUrl string) error {
-	wh := webhookSub{"http://35.189.39.205/callback", "subscribe", topicUrl, 6400}
+func SubscribeWebhook (accessToken string, clientId string, apiUrl string, topicUrl string, callbackUrl string) error {
+	wh := webhookSub{
+		callbackUrl,
+		"subscribe",
+		topicUrl,
+		6400}  // lease was picked arbitrarily
 	b, marshalErr := json.Marshal(&wh)
 	if marshalErr != nil {
 		return marshalErr
@@ -140,7 +146,6 @@ func SubscribeWebhook (accessToken string, clientId string, apiUrl string, topic
 	// Send request
 	client := &http.Client{}
 	resp, postErr := client.Do(req)
-
 	if postErr != nil {
 		return postErr
 	}
