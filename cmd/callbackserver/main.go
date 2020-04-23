@@ -12,29 +12,17 @@ import (
 )
 
 var (
-	address string
+	addr string
 	kafkaAddress string
-	clientId string
-	clientSecret string
-	callbackUrl string
 )
 
 type notificationMsg struct {
 	link string
 	body string
 }
-func writeNotification() error {
-	msg := notificationMsg{`[<https://api.twitch.tv/helix/webhooks/hub>; rel=\"hub\", <https://api.twitch.tv/helix/users/follows?first=1&to_id=188951100>; rel=\"self\"]`,
-		`{"data":[{"followed_at":"2020-04-22T22:26:18Z","from_id":"59480475","from_name":"eventualdecline","to_id":"188951100","to_name":"james65535"}]}`}
-	str := fmt.Sprintf("%#v", msg)
-	err := kafkaWrite("twitch", str)
-	if err != nil {
-		return err
-	} else { return nil }
-}
 
+// Handles writing to Kafka broker
 func kafkaWrite(topic, msg string) error {
-	// to produce messages
 	partition := 0
 
 	conn, connectErr := kafka.DialLeader(context.Background(), "tcp", kafkaAddress, topic, partition)
@@ -50,34 +38,17 @@ func kafkaWrite(topic, msg string) error {
 	return nil
 }
 
-func kafkaRead() error {
-	// to consume messages
-	topic := "my-topic"
-	partition := 0
-
-	conn,err := kafka.DialLeader(context.Background(), "tcp", kafkaAddress, topic, partition)
+// Writes the webhook event notification to kafka broker
+func writeNotification(msg string) error {
+	err := kafkaWrite("twitch", msg)
 	if err != nil {
 		return err
+	} else {
+		return nil
 	}
-
-	conn.SetReadDeadline(time.Now().Add(10*time.Second))
-	batch := conn.ReadBatch(10e3, 1e6) // fetch 10KB min, 1MB max
-
-	b := make([]byte, 10e3) // 10KB max per message
-	for {
-		_, err := batch.Read(b)
-		if err != nil {
-			break
-		}
-		fmt.Println(string(b))
-	}
-
-	batch.Close()
-	conn.Close()
-	return nil
 }
 
-// Respond to callback challenge
+// Respond to twitch callback challenge for GET and notifications for POST
 func callback(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		// Receive subscription verify/deny challenges
@@ -100,93 +71,54 @@ func callback(w http.ResponseWriter, r *http.Request) {
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			log.Printf("Cannot read body: %s", err)
+		} else {
+			log.Printf("Callback Body: %s", body)
+			// TODO asses serializing to json instead of string
+			/*
+				body := notificationMsg{`[<https://api.twitch.tv/helix/webhooks/hub>; rel=\"hub\", <https://api.twitch.tv/helix/users/follows?first=1&to_id=188951100>; rel=\"self\"]`,
+					`{"data":[{"followed_at":"2020-04-22T22:26:18Z","from_id":"59480475","from_name":"eventualdecline","to_id":"188951100","to_name":"james65535"}]}`}
+			*/
+			str := fmt.Sprintf("%#v", body)
+			writeErr := writeNotification(str)
+			if writeErr != nil {
+				log.Printf("Cannot do write notification: %s", writeErr)
+			}
 		}
-		log.Printf("Callback Body: %s", body)
-	}
-}
-
-func submit(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "POST" {
-		log.Printf("Submit POST request received!\n")
-		log.Printf("Header: %s", r.Header)
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			log.Printf("Cannot read body: %s", err)
-		}
-		log.Printf("Body: %s", body)
-	} else if r.Method == "GET" {
-		log.Printf("Submit GET request received!\n")
-		log.Printf("Header: %s", r.Header)
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			log.Printf("Cannot read body: %s", err)
-		}
-		log.Printf("Body: %s", body)
 	}
 }
 
 func home(w http.ResponseWriter, r *http.Request){
 	if r.Method == "GET" {
 		log.Printf("Home GET request received!\n")
-		/*
-			err := kafkaWrite()
-			if err != nil {
-				log.Printf("Kafka Write Error %v\n", err)
-			}
-			log.Printf("Done with Kafka Write\n")
 
-			readErr := kafkaRead()
-			if readErr != nil {
-				log.Printf("Kafka Read Error %v\n", readErr)
-			}
-		*/
 	} else {return}
 }
 
 func init() {
-	// Webserver
+	// Webserver setup
 	if os.Getenv("ADDRESS") != "" {
-		address = os.Getenv("ADDRESS")
+		addr = os.Getenv("ADDRESS")
+		log.Printf("Webserver address: %v\n", addr)
 	} else {
-		address = ":8080"
-		log.Printf("No server address specified, defaulting to: %v\n", address)
-	}
-	if os.Getenv("CALLBACKURL") != "" {
-		callbackUrl = os.Getenv("CALLBACKURL")
-	} else {
-		callbackUrl = "127.0.0.1"
-		log.Printf("No callback URL specified, defaulting to: %v\n", callbackUrl)
+		addr = ":8080"
+		log.Printf("No server address specified, defaulting to: %v\n", addr)
 	}
 
-
-	// Kafka
+	// Kafka setup
 	if os.Getenv("KAFKAADDRESS") != "" {
 		kafkaAddress = os.Getenv("KAFKAADDRESS")
+		log.Printf("Using kafka server: %v\n", kafkaAddress)
 	} else {
-		log.Printf("No kafka server address specified\n")
 		kafkaAddress = "127.0.0.1:9092"
-	}
-
-	// Twitch
-	if os.Getenv("TWITCHCLIENTID") != "" {
-		clientId = os.Getenv("TWITCHCLIENTID")
-	} else {
-		log.Printf("No twitch client ID specified\n")
-	}
-	if os.Getenv("TWITCHCLIENTSECRET") != "" {
-		clientSecret = os.Getenv("TWITCHCLIENTSECRET")
-	} else {
-		log.Printf("No twitch client secret specified\n")
+		log.Printf("No kafka server address specified, defaulting to: %v\n", kafkaAddress)
 	}
 }
 
 func main() {
-	writeNotification()
-	log.Printf("Server starting")
+	log.Printf("Callback server starting\n")
 	http.HandleFunc("/callback", callback)
-	http.HandleFunc("/submit", submit)
 	http.HandleFunc("/", home)
-	err := http.ListenAndServe(address, nil)
+	err := http.ListenAndServe(addr, nil)
 	if err != nil {
 		log.Fatalf("Error %v\n", err)
 	}

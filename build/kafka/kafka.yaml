@@ -88,4 +88,4 @@ spec:
             - name: KAFKA_CFG_ZOOKEEPER_CONNECT
               value: "zk-svc:2181"
             - name: KAFKA_ADVERTISED_LISTENERS
-              value: "PLAINTEXT://127.0.0.1:9092"
+              value: "PLAINTEXT://kafka-svc:9092"
