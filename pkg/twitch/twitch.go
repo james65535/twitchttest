@@ -25,8 +25,8 @@ type webhookSub struct {
 // TODO remove logging
 
 // Obtains an access token
-func GetAccessToken(id string, secret string, url string) (accesToken string, expires int, err error) {
-	req, err := http.NewRequest("POST", url, nil)
+func GetAccessToken(id, secret, tokenUrl, validateUrl string) (accesToken string, expires int, err error) {
+	req, err := http.NewRequest("POST", tokenUrl, nil)
 	if err != nil {
 		return "", 0, err
 	}
@@ -57,14 +57,19 @@ func GetAccessToken(id string, secret string, url string) (accesToken string, ex
 		if parseErr != nil {
 			return "", 0, parseErr
 		}
-		return a.Access_token, a.Expires_in, nil
+		validateErr := validate(a.Access_token,validateUrl)
+		if validateErr != nil {
+			return "", 0, validateErr
+		} else {
+			return a.Access_token, a.Expires_in, nil
+		}
 	} else {
 		return "", 0, fmt.Errorf(string(body))
 	}
 }
 
 // Validates Access Tokens
-func validate(accessToken string, url string) error {
+func validate(accessToken, url string) error {
 	// Setup request
 	req, requestErr := http.NewRequest("GET", url, nil)
 	if requestErr != nil {
@@ -93,7 +98,7 @@ func validate(accessToken string, url string) error {
 }
 
 // Generic query
-func Query(accessToken string, clientId string, url string) error {
+func Query(accessToken, clientId, url string) error {
 	// Setup request
 	req, requestErr := http.NewRequest("GET", url, nil)
 	if requestErr != nil {
@@ -124,7 +129,7 @@ func Query(accessToken string, clientId string, url string) error {
 }
 
 // Subscribe to a webhook
-func SubscribeWebhook (accessToken string, clientId string, apiUrl string, topicUrl string, callbackUrl string) error {
+func SubscribeWebhook (accessToken, clientId, apiUrl, topicUrl, callbackUrl string) error {
 	wh := webhookSub{
 		callbackUrl,
 		"subscribe",
@@ -156,7 +161,6 @@ func SubscribeWebhook (accessToken string, clientId string, apiUrl string, topic
 		return readErr
 	}
 	if resp.StatusCode == 202 {
-		log.Printf("Subscription body: %s", body)
 		return nil
 	} else {
 		return fmt.Errorf(string(body))
@@ -164,7 +168,7 @@ func SubscribeWebhook (accessToken string, clientId string, apiUrl string, topic
 }
 
 // Get webhook subscriptions
-func GetSubs (accessToken string, clientId string, apiUrl string) error {
+func GetSubs (accessToken, clientId, apiUrl string) error {
 	req, err := http.NewRequest("GET", apiUrl, nil)
 	if err != nil {
 		return err

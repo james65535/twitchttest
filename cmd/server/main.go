@@ -24,26 +24,28 @@ type notificationMsg struct {
 	body string
 }
 func writeNotification() error {
-
-
-	return nil
+	msg := notificationMsg{`[<https://api.twitch.tv/helix/webhooks/hub>; rel=\"hub\", <https://api.twitch.tv/helix/users/follows?first=1&to_id=188951100>; rel=\"self\"]`,
+		`{"data":[{"followed_at":"2020-04-22T22:26:18Z","from_id":"59480475","from_name":"eventualdecline","to_id":"188951100","to_name":"james65535"}]}`}
+	str := fmt.Sprintf("%#v", msg)
+	err := kafkaWrite("twitch", str)
+	if err != nil {
+		return err
+	} else { return nil }
 }
 
-func kafkaWrite() error {
+func kafkaWrite(topic, msg string) error {
 	// to produce messages
-	topic := "my-topic"
 	partition := 0
 
-	conn, err := kafka.DialLeader(context.Background(), "tcp", kafkaAddress, topic, partition)
-    if err != nil {
-    	return err
+	conn, connectErr := kafka.DialLeader(context.Background(), "tcp", kafkaAddress, topic, partition)
+    if connectErr != nil {
+    	return connectErr
 	}
 	conn.SetWriteDeadline(time.Now().Add(10*time.Second))
-	conn.WriteMessages(
-		kafka.Message{Value: []byte("one!")},
-		kafka.Message{Value: []byte("two!")},
-		kafka.Message{Value: []byte("three!")},
-	)
+	_, writeErr := conn.WriteMessages(kafka.Message{Value: []byte(msg)})
+	if writeErr != nil {
+		return writeErr
+	}
 	conn.Close()
 	return nil
 }
