@@ -1,5 +1,5 @@
 FROM golang:1.14 AS build-env
-COPY /cmd/server /go/src/app
+COPY /cmd/callbackserver /go/src/app
 COPY /vendor /go/src/app/vendor
 WORKDIR /go/src/app
 #RUN go install -i

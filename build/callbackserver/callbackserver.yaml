@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: twitchtest-svc
+  name: twitch-callbackserver-svc
   namespace: default
 spec:
   selector:
-    app: twitchtest
+    app: callbackserver
   ports:
     - protocol: TCP
       port: 80
@@ -15,21 +15,21 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: twitchtest-dep
+  name: callbackserver-dep
   namespace: default
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: twitchtest
+      app: callbackserver
   template:
     metadata:
       labels:
-        app: twitchtest
+        app: callbackserver
     spec:
       containers:
-        - name: twitchtest
-          image: james65535/twitchtest:latest
+        - name: callbackserver
+          image: james65535/callbackserver:latest
           imagePullPolicy: Always
           ports:
           - containerPort: 8080
