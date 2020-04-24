@@ -24,7 +24,6 @@ type notificationMsg struct {
 // Handles writing to Kafka broker
 func kafkaWrite(topic, msg string) error {
 	partition := 0
-
 	conn, connectErr := kafka.DialLeader(context.Background(), "tcp", kafkaAddress, topic, partition)
     if connectErr != nil {
     	return connectErr
@@ -40,7 +39,7 @@ func kafkaWrite(topic, msg string) error {
 
 // Writes the webhook event notification to kafka broker
 func writeNotification(msg string) error {
-	err := kafkaWrite("twitch", msg)
+	err := kafkaWrite("inbound-twitch", msg)
 	if err != nil {
 		return err
 	} else {
