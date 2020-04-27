@@ -10,3 +10,4 @@ To utilize Twitch webhooks to populate events in the service and have consumers 
 * Understand value proposition of Tanzu portfolio
   * Improve process around current YAML manipulation
   * Improve process for multiple contributors to roll out private environments
+  * Integrate Wavefront for metrics and tracing
