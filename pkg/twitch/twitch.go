@@ -39,33 +39,31 @@ func GetAccessToken(id, secret, tokenUrl, validateUrl string) (accesToken string
 
 	// Send request
 	client := &http.Client{}
-	resp, postErr := client.Do(req)
-
-	if postErr != nil {
-		return "", 0, postErr
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", 0, err
 	}
 	defer resp.Body.Close()
 
-	body, readErr := ioutil.ReadAll(resp.Body)
-	if readErr != nil {
-		return "", 0, readErr
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", 0, err
 	}
 
 	if resp.StatusCode == 200 {
 		var a appAccessToken
-		parseErr := json.Unmarshal(body, &a)
-		if parseErr != nil {
-			return "", 0, parseErr
+		if err := json.Unmarshal(body, &a)
+		err != nil {
+			return "", 0, err
 		}
-		validateErr := validate(a.Access_token,validateUrl)
-		if validateErr != nil {
-			return "", 0, validateErr
-		} else {
-			return a.Access_token, a.Expires_in, nil
+		if err := validate(a.Access_token,validateUrl)
+		err != nil {
+			return "", 0, err
 		}
-	} else {
-		return "", 0, fmt.Errorf(string(body))
+		return a.Access_token, a.Expires_in, nil
 	}
+
+	return "", 0, fmt.Errorf(string(body))
 }
 
 // Validates Access Tokens
@@ -100,30 +98,33 @@ func validate(accessToken, url string) error {
 // Generic query
 func Query(accessToken, clientId, url string) error {
 	// Setup request
-	req, requestErr := http.NewRequest("GET", url, nil)
-	if requestErr != nil {
-		return requestErr
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
 	}
+
 	req.Header.Add("Authorization", "Bearer " + accessToken)
 	req.Header.Add("Client-ID", clientId)
 	client := &http.Client{}
 
 	// Send request
-	resp, clientErr := client.Do(req)
-	if clientErr != nil {
-		return clientErr
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
 	}
+
 	defer resp.Body.Close()
-	body, readErr := ioutil.ReadAll(resp.Body)
-	if readErr != nil {
-		return readErr
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
 	}
 	log.Printf("query body: %s", body)
 
 	// TODO handle error codes example: {"status":401,"message":"invalid access token"}
-	if resp.StatusCode == 200 {
+	switch resp.StatusCode {
+	case 200:
 		return nil // {"client_id":"somestuff","scopes":[],"expires_in":5190956}
-	} else {
+	default:
 		return fmt.Errorf(string(body))
 	}
 }
@@ -135,9 +136,9 @@ func SubscribeWebhook (accessToken, clientId, apiUrl, topicUrl, callbackUrl stri
 		"subscribe",
 		topicUrl,
 		6400}  // lease was picked arbitrarily
-	b, marshalErr := json.Marshal(&wh)
-	if marshalErr != nil {
-		return marshalErr
+	b, err := json.Marshal(&wh)
+	if err != nil {
+		return err
 	}
 	req, err := http.NewRequest("POST", apiUrl, bytes.NewBuffer(b))
 	if err != nil {
@@ -150,19 +151,21 @@ func SubscribeWebhook (accessToken, clientId, apiUrl, topicUrl, callbackUrl stri
 
 	// Send request
 	client := &http.Client{}
-	resp, postErr := client.Do(req)
-	if postErr != nil {
-		return postErr
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
 	}
-	defer resp.Body.Close()
 
-	body, readErr := ioutil.ReadAll(resp.Body)
-	if readErr != nil {
-		return readErr
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
 	}
-	if resp.StatusCode == 202 {
+
+	switch resp.StatusCode {
+	case 202:
 		return nil
-	} else {
+	default:
 		return fmt.Errorf(string(body))
 	}
 }
@@ -173,27 +176,26 @@ func GetSubs (accessToken, clientId, apiUrl string) error {
 	if err != nil {
 		return err
 	}
-
 	req.Header.Add("Authorization", "Bearer " + accessToken)
 	req.Header.Add("Client-ID", clientId)
 
 	// Send request
 	client := &http.Client{}
-	resp, getErr := client.Do(req)
-
-	if getErr != nil {
-		return getErr
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
 	}
+
 	defer resp.Body.Close()
-
-	body, readErr := ioutil.ReadAll(resp.Body)
-	if readErr != nil {
-		return readErr
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
 	}
-	if resp.StatusCode == 200 {
-		log.Printf("Subscription body: %s", body)
+	switch resp.StatusCode {
+	case 200:
+		log.Printf("Subscription body: %s", body) // TODO either return or remove
 		return nil
-	} else {
+	default:
 		return fmt.Errorf(string(body))
 	}
 }

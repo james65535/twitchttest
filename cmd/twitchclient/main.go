@@ -40,34 +40,33 @@ func main() {
 	apiUrl := "https://api.twitch.tv/helix"
 
 	// Create an Access Token
-	s, _, tokenErr := twitch.GetAccessToken(
+	s, _, err := twitch.GetAccessToken(
 		clientId,
 		clientSecret,
 		idUrl+"/token",
 		idUrl+"/validate")
-	if tokenErr != nil {
-		log.Fatalf("Access token error: %s", tokenErr)
-	} else {
-		log.Printf("Access token: %s\n", s)
+	if err != nil {
+		log.Fatalf("Access token error: %s", err)
 	}
+	log.Printf("Access token: %s\n", s)
 
 	// Perform twitch API query
 	// query(s,clientId, apiUrl + "/users?login=james65535"
 
 	// Subscribe to a user follows update topic
-	subErr := twitch.SubscribeWebhook(
+	if err := twitch.SubscribeWebhook(
 		s,
 		clientId,
 		apiUrl+"/webhooks/hub",
 		apiUrl+"/users/follows?first=1&to_id=188951100",
 		callbackUrl)
-	if subErr != nil {
-		log.Printf("Subscribe error: %s\n", subErr)
+	err != nil {
+		log.Printf("Subscribe error: %s\n", err)
 	}
 
 	// Check for current subscriptions
-	subsErr := twitch.GetSubs(s,clientId,apiUrl + "/webhooks/subscriptions")
-	if subsErr != nil {
-		log.Printf("Subscribe error: %s\n", subsErr)
+	if err := twitch.GetSubs(s,clientId,apiUrl + "/webhooks/subscriptions")
+	err != nil {
+		log.Printf("Subscribe error: %s\n", err)
 	}
 }

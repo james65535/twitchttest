@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"github.com/segmentio/kafka-go"
 	"log"
 	"os"
@@ -15,18 +14,39 @@ var (
 	groupId string
 )
 
+type Data struct {
+	Followed_at string
+	From_id string
+	From_name string
+	To_id string
+	To_name string
+}
+
+type UserMsg struct {
+	Header map[string][]string
+	Body []Data
+}
+
 // Handles writing to Kafka broker
-func kafkaWrite(topic, msg string) error {
-	partition := 0
-	conn, connectErr := kafka.DialLeader(context.Background(), "tcp", kafkaAddress, topic, partition)
-	if connectErr != nil {
-		return connectErr
+func kafkaWrite(topic string, msg []byte) error {
+	conn, err := kafka.DialLeader(
+		context.Background(),
+		"tcp",
+		kafkaAddress,
+		topic,
+		0)
+	if err != nil {
+		return err
 	}
+
 	conn.SetWriteDeadline(time.Now().Add(10*time.Second))
-	_, writeErr := conn.WriteMessages(kafka.Message{Value: []byte(msg)})
-	if writeErr != nil {
-		return writeErr
+	if _, err := conn.WriteMessages(
+		kafka.Message{
+			Value: []byte(msg)})
+	err != nil {
+		return err
 	}
+
 	conn.Close()
 	return nil
 }
@@ -64,13 +84,20 @@ func main() {
 	if topic == "test-topic" {
 		log.Printf("Running topic write test\n")
 		// write to test topic
-		msg := fmt.Sprintf("test: %s", time.Now())
-		writeErr := kafkaWrite(topic, msg)
-		if writeErr != nil {
-			log.Printf("Error writing message: %s\n", writeErr)
-		} else {
-			log.Printf("Test write completed\n")
+		//header := map[string]string{"link":`"[<https://api.twitch.tv/helix/webhooks/hub>; rel="hub", <https://api.twitch.tv/helix/users/follows?first=1&to_id=188951100>; rel="self"]"`}
+		msg1 := UserMsg{
+			map[string]string{"link":`"[<https://api.twitch.tv/helix/webhooks/hub>; rel="hub", <https://api.twitch.tv/helix/users/follows?first=1&to_id=188951100>; rel="self"]"`},
+			Body: []Data{},
 		}
+		msg := []byte("{\"header\": \"[<https://api.twitch.tv/helix/webhooks/hub>; rel=\"hub\", <https://api.twitch.tv/helix/users/follows?first=1&to_id=188951100>; rel=\"self\"]\",\"body\": {\"data\": [{\"followed_at\": \"2020-04-22T22:26:18Z\",\"from_id\": \"59480475\",\"from_name\": \"eventualdecline\",\"to_id\": \"188951100\",\"to_name\": \"james65535\"}]}}")
+
+		//msg := fmt.Sprintf("test: %s", time.Now())
+		if err := kafkaWrite(topic, msg)
+		err != nil {
+			log.Printf("Error writing message: %s\n", err)
+		}
+
+		log.Printf("Test write completed\n")
 	}
 
 	// TODO check dispatch queue for new messages and process

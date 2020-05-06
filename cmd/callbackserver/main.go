@@ -16,35 +16,42 @@ var (
 	kafkaAddress string
 )
 
+// TODO look to implement, perhaps place in twitch pkg
 type notificationMsg struct {
-	link string
-	body string
+	Header map[string]string
+	Body []byte
 }
 
 // Handles writing to Kafka broker
 func kafkaWrite(topic, msg string) error {
-	partition := 0
-	conn, connectErr := kafka.DialLeader(context.Background(), "tcp", kafkaAddress, topic, partition)
-    if connectErr != nil {
-    	return connectErr
+	conn, err := kafka.DialLeader(
+		context.Background(),
+		"tcp",
+		kafkaAddress,
+		topic,
+		0)
+    if err != nil {
+    	return err
 	}
+
 	conn.SetWriteDeadline(time.Now().Add(10*time.Second))
-	_, writeErr := conn.WriteMessages(kafka.Message{Value: []byte(msg)})
-	if writeErr != nil {
-		return writeErr
+	if _, err := conn.WriteMessages(
+		kafka.Message{Value: []byte(msg)}); err != nil {
+		return err
 	}
+
 	conn.Close()
 	return nil
 }
 
 // Writes the webhook event notification to kafka broker
 func writeNotification(msg string) error {
-	err := kafkaWrite("inbound-twitch", msg)
-	if err != nil {
+	if err := kafkaWrite("inbound-twitch", msg)
+	err != nil {
 		return err
-	} else {
-		return nil
 	}
+
+	return nil
 }
 
 // Respond to twitch callback challenge for GET and notifications for POST
@@ -72,15 +79,15 @@ func callback(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Cannot read body: %s", err)
 		} else {
 			log.Printf("Callback Body: %s", body)
-			// TODO asses serializing to json instead of string
+			// TODO assess serializing to json instead of string
 			/*
 				body := notificationMsg{`[<https://api.twitch.tv/helix/webhooks/hub>; rel=\"hub\", <https://api.twitch.tv/helix/users/follows?first=1&to_id=188951100>; rel=\"self\"]`,
 					`{"data":[{"followed_at":"2020-04-22T22:26:18Z","from_id":"59480475","from_name":"eventualdecline","to_id":"188951100","to_name":"james65535"}]}`}
 			*/
 			str := fmt.Sprintf("%#v", body)
-			writeErr := writeNotification(str)
-			if writeErr != nil {
-				log.Printf("Cannot do write notification: %s", writeErr)
+			if err := writeNotification(str)
+			err != nil {
+				log.Printf("Cannot do write notification: %s", err)
 			}
 		}
 	}
@@ -117,8 +124,8 @@ func main() {
 	log.Printf("Callback server starting\n")
 	http.HandleFunc("/callback", callback)
 	http.HandleFunc("/", home)
-	err := http.ListenAndServe(addr, nil)
-	if err != nil {
+	if err := http.ListenAndServe(addr, nil)
+	err != nil {
 		log.Fatalf("Error %v\n", err)
 	}
 }

@@ -1,10 +1,9 @@
 package main
 
 import (
+	"context"
 	"github.com/segmentio/kafka-go"
 	"log"
-	"time"
-	"context"
 	"os"
 )
 
@@ -13,27 +12,41 @@ var (
 	topic string
 	groupId string
 )
+type data struct {
+	Followed_at string
+	From_id string
+	From_name string
+	To_id string
+	To_name string
+}
+
+type userMsg struct {
+	Header map[string][]string
+	Body []data
+}
 
 func kafkaReader(topic, gid, addr string) error {
-	r := kafka.NewReader(kafka.ReaderConfig{
+	r := kafka.NewReader(
+		kafka.ReaderConfig{
 		Brokers: []string{addr},
 		GroupID: gid,
 		Topic: topic,
 		MinBytes: 10e3,
-		MaxBytes: 10e6,
-	})
+		MaxBytes: 10e6})
 
 	for {
-		msg, readErr := r.ReadMessage(context.Background())
-		if readErr != nil {
-			return readErr
-		} else {
-			log.Printf("Message at topic/partition/offset %v/%v/%v: %s = %s\n", msg.Topic, msg.Partition, msg.Offset, string(msg.Key), string(msg.Value))
-			return nil
+		msg, err := r.ReadMessage(context.Background())
+		if err != nil {
+			return err
 		}
+
+		log.Printf("Message at topic/partition/offset %v/%v/%v: %s = %s\n", msg.Topic, msg.Partition, msg.Offset, string(msg.Key), string(msg.Value))
+		return nil
 	}
 }
 
+/*
+// TODO remove in favour of reader
 // Handles reading from Kafka broker
 func kafkaRead(topic string) error {
 	partition := 0
@@ -47,8 +60,7 @@ func kafkaRead(topic string) error {
 
 	b := make([]byte, 10e3) // 10KB max per message
 	for {
-		_, err := batch.Read(b)
-		if err != nil {
+		if _, err := batch.Read(b); err != nil {
 			break
 		}
 		log.Printf("kafka msg body: %v\n", string(b))
@@ -58,6 +70,7 @@ func kafkaRead(topic string) error {
 	conn.Close()
 	return nil
 }
+*/
 
 func init() {
 	// Kafka setup
@@ -92,12 +105,14 @@ func main(){
 	if topic == "test-topic" {
 		log.Printf("Running topic read test\n")
 		// write to test topic
-		readErr := kafkaReader(topic, groupId, kafkaAddress)
-		if readErr != nil {
-			log.Printf("Error reading message: %s\n", readErr)
-		} else {
-			log.Printf("Test read completed\n")
+		if err := kafkaReader(
+			topic,
+			groupId,
+			kafkaAddress)
+		err != nil {
+			log.Printf("Error reading message: %s\n", err)
 		}
-		log.Printf("Done kafka read\n")
+
+		log.Printf("Test read completed\n")
 	}
 }
